@@ -762,6 +762,7 @@ class CropRotateEditorState extends State<CropRotateEditor>
         newTransformConfigs: transformC,
         layerDrawAreaSize: originalSize,
         fitToScreenFactor: _transformHelperScale,
+        transformHelperScale: _transformHelperScale,
         undoChanges: false,
       ).updatedLayers;
       _layers = updatedLayers;
