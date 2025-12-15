@@ -32,7 +32,11 @@ class DeferPointer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final link = this.link ?? DeferredPointerHandler.of(context).link;
+    // DeferredPointerHandler might not be present in cases such as during Hero 
+    // animations, when widgets are moved to the overlay.
+    final handler = DeferredPointerHandler.maybeOf(context);
+    final link = this.link ?? handler?.link;
+    if (link == null) return child;
     return _DeferPointerRenderObjectWidget(
       link: link,
       deferPaint: paintOnTop,

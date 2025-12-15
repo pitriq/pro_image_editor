@@ -30,6 +30,14 @@ class DeferredPointerHandler extends StatefulWidget {
         'DeferredPaintSurface was not found on this context.');
     return inherited!.state;
   }
+
+  /// The state from the closest instance of this class that encloses
+  /// the given context, or null if none is found.
+  static DeferredPointerHandlerState? maybeOf(BuildContext context) {
+    final inherited = context
+        .dependOnInheritedWidgetOfExactType<_InheritedDeferredPaintSurface>();
+    return inherited?.state;
+  }
 }
 
 /// Holds an internal [DeferredPointerHandlerLink] which can be found using
