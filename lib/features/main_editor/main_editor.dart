@@ -1695,6 +1695,7 @@ class ProImageEditorState extends State<ProImageEditor>
               layerDrawAreaSize: sizesManager.bodySize,
               undoChanges: false,
               fitToScreenFactor: fitToScreenFactor,
+              transformHelperScale: fitToScreenFactor,
             ).updatedLayers;
 
             _imageInfos = null;
