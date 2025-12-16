@@ -130,6 +130,7 @@ class ContentRecorderController {
     ui.Image? image,
     OutputFormat? outputFormat,
   }) async {
+    final stopwatch = Stopwatch()..start();
     /// If we're just capturing a screenshot for the state history in the web
     /// platform, but web worker is not supported, we return null.
     if (kIsWeb && stateHistoryScreenshot && (!_threadManager.isSupported)) {
@@ -140,17 +141,27 @@ class ContentRecorderController {
     }
 
     outputFormat ??= _configs.outputFormat;
-    image ??= await getRawRenderedImage(imageInfos: imageInfos);
+    if (image == null) {
+      image = await getRawRenderedImage(imageInfos: imageInfos);
+    }
     id ??= generateUniqueId();
     onImageCaptured?.call(image);
 
     if (image == null) return null;
 
-    return await _imageConverterService.convert(
+    final result = await _imageConverterService.convert(
       image: image,
       id: id,
       format: outputFormat,
     );
+    
+    stopwatch.stop();
+    final imageSize = '${image.width}x${image.height}';
+    debugPrint(
+      '[BENCHMARK] _captureImageContent: ${stopwatch.elapsedMilliseconds}ms (size: $imageSize, format: ${outputFormat?.name})',
+    );
+    
+    return result;
   }
 
   /// Captures the visual representation of a widget, rendering it into an image
@@ -272,6 +283,10 @@ class ContentRecorderController {
     Uint8List? originalImageBytes,
     Size? targetSize,
   }) async {
+    final stopwatch = Stopwatch()..start();
+    final imageSize = '${imageInfos.renderedSize.width.toInt()}x${imageInfos.renderedSize.height.toInt()}';
+    debugPrint('[BENCHMARK] captureFinalScreenshot START ($imageSize)');
+    
     Uint8List? bytes;
 
     bool isGenerationActive =
@@ -329,6 +344,13 @@ class ContentRecorderController {
               imageInfos: imageInfos,
             );
     }
+    
+    stopwatch.stop();
+    final outputSize = bytes != null ? '${(bytes.length / 1024).toStringAsFixed(0)}KB' : 'null';
+    debugPrint(
+      '[BENCHMARK] captureFinalScreenshot TOTAL: ${stopwatch.elapsedMilliseconds}ms, output: $outputSize',
+    );
+    
     return bytes;
   }
 

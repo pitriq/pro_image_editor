@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '/core/models/editor_configs/image_generation_configs/image_generation_configs.dart';
@@ -48,6 +50,7 @@ class ImageRenderService {
     GlobalKey? widgetKey,
     bool useThumbnailSize = false,
   }) async {
+    final stopwatch = Stopwatch()..start();
     try {
       widgetKey ??= containerKey;
 
@@ -89,14 +92,26 @@ class ImageRenderService {
       double pixelRatio = configs.customPixelRatio ?? outputRatio;
 
       // Capture image
+      final toImageStopwatch = Stopwatch()..start();
       ui.Image image = await _convertToDartUiImage(
         boundary,
         imageInfos,
         pixelRatio,
       );
+      toImageStopwatch.stop();
+      
+      stopwatch.stop();
+      final imageSize = '${image.width}x${image.height}';
+      debugPrint(
+        '[BENCHMARK] getRawRenderedImage.boundary.toImage: ${toImageStopwatch.elapsedMilliseconds}ms',
+      );
+      debugPrint(
+        '[BENCHMARK] getRawRenderedImage: ${stopwatch.elapsedMilliseconds}ms (size: $imageSize, pixelRatio: ${pixelRatio.toStringAsFixed(2)})',
+      );
 
       return image;
     } catch (e) {
+      stopwatch.stop();
       debugPrint('Failed to read image data: ${e.toString()}');
       return null;
     }

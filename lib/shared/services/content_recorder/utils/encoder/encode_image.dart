@@ -2,6 +2,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 import '/core/models/editor_configs/image_generation_configs/output_formats.dart';
 import '/core/models/multi_threading/thread_request_model.dart';
 import '/plugins/image/src/formats/formats.dart';
@@ -52,9 +54,13 @@ Future<Uint8List> encodeImage({
   required int jpegBackgroundColor,
   Completer<void>? destroy$,
 }) async {
+  final stopwatch = Stopwatch()..start();
+  final imageSize = '${image.width}x${image.height}';
   Uint8List bytes;
+  
   switch (outputFormat) {
     case OutputFormat.jpg:
+      final encodeStopwatch = Stopwatch()..start();
       bytes = await encodeJpg(
         image,
         quality: jpegQuality,
@@ -62,34 +68,79 @@ Future<Uint8List> encodeImage({
         destroy$: destroy$,
         backgroundColor: jpegBackgroundColor,
       );
+      encodeStopwatch.stop();
+      final outputSize = '${(bytes.length / 1024).toStringAsFixed(0)}KB';
+      debugPrint(
+        '[BENCHMARK] encodeJpg (q:$jpegQuality, chroma:$jpegChroma): ${encodeStopwatch.elapsedMilliseconds}ms (size: $imageSize, output: $outputSize)',
+      );
       break;
     case OutputFormat.png:
+      final encodeStopwatch = Stopwatch()..start();
       bytes = encodePng(
         image,
         filter: pngFilter,
         level: pngLevel,
         singleFrame: singleFrame,
       );
+      encodeStopwatch.stop();
+      final outputSize = '${(bytes.length / 1024).toStringAsFixed(0)}KB';
+      debugPrint(
+        '[BENCHMARK] encodePng (filter:$pngFilter, level:$pngLevel): ${encodeStopwatch.elapsedMilliseconds}ms (size: $imageSize, output: $outputSize)',
+      );
       break;
     case OutputFormat.tiff:
+      final encodeStopwatch = Stopwatch()..start();
       bytes = encodeTiff(image, singleFrame: singleFrame);
+      encodeStopwatch.stop();
+      debugPrint(
+        '[BENCHMARK] encodeTiff: ${encodeStopwatch.elapsedMilliseconds}ms (size: $imageSize)',
+      );
       break;
     case OutputFormat.bmp:
+      final encodeStopwatch = Stopwatch()..start();
       bytes = encodeBmp(image);
+      encodeStopwatch.stop();
+      debugPrint(
+        '[BENCHMARK] encodeBmp: ${encodeStopwatch.elapsedMilliseconds}ms (size: $imageSize)',
+      );
       break;
     case OutputFormat.cur:
+      final encodeStopwatch = Stopwatch()..start();
       bytes = encodeCur(image, singleFrame: singleFrame);
+      encodeStopwatch.stop();
+      debugPrint(
+        '[BENCHMARK] encodeCur: ${encodeStopwatch.elapsedMilliseconds}ms (size: $imageSize)',
+      );
       break;
     case OutputFormat.pvr:
+      final encodeStopwatch = Stopwatch()..start();
       bytes = encodePvr(image, singleFrame: singleFrame);
+      encodeStopwatch.stop();
+      debugPrint(
+        '[BENCHMARK] encodePvr: ${encodeStopwatch.elapsedMilliseconds}ms (size: $imageSize)',
+      );
       break;
     case OutputFormat.tga:
+      final encodeStopwatch = Stopwatch()..start();
       bytes = encodeTga(image);
+      encodeStopwatch.stop();
+      debugPrint(
+        '[BENCHMARK] encodeTga: ${encodeStopwatch.elapsedMilliseconds}ms (size: $imageSize)',
+      );
       break;
     case OutputFormat.ico:
+      final encodeStopwatch = Stopwatch()..start();
       bytes = encodeIco(image, singleFrame: singleFrame);
+      encodeStopwatch.stop();
+      debugPrint(
+        '[BENCHMARK] encodeIco: ${encodeStopwatch.elapsedMilliseconds}ms (size: $imageSize)',
+      );
       break;
   }
+  stopwatch.stop();
+  debugPrint(
+    '[BENCHMARK] encodeImage: ${stopwatch.elapsedMilliseconds}ms (format: ${outputFormat.name}, size: $imageSize)',
+  );
   return bytes;
 }
 

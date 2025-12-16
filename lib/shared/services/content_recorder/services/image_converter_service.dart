@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -63,29 +64,39 @@ class ImageConverterService {
     required String id,
     OutputFormat? format,
   }) async {
+    final stopwatch = Stopwatch()..start();
     format ??= configs.outputFormat;
+    final imageSize = '${image.width}x${image.height}';
 
     if (configs.enableIsolateGeneration) {
       try {
         /// For the case multithreading isn't supported we fall back to the
         /// main thread.
         if (!threadManager.isSupported) {
+          debugPrint('[BENCHMARK] convert: using main thread (isolate not supported)');
           return await _convertOnMainThread(image: image);
         }
 
-        return await threadManager.send(
+        debugPrint('[BENCHMARK] convert: using isolate thread');
+        final result = await threadManager.send(
           await _generateSendImageData(
             id: id,
             image: image,
             format: format,
           ),
         );
+        stopwatch.stop();
+        debugPrint(
+          '[BENCHMARK] convert (isolate): ${stopwatch.elapsedMilliseconds}ms (size: $imageSize, format: ${format.name})',
+        );
+        return result;
       } catch (e) {
         // Fallback to the main thread.
         debugPrint('Fallback to main thread: $e');
         return await _convertOnMainThread(image: image);
       }
     } else {
+      debugPrint('[BENCHMARK] convert: using main thread (isolate disabled)');
       return await _convertOnMainThread(image: image);
     }
   }
@@ -102,13 +113,30 @@ class ImageConverterService {
   Future<Uint8List?> _convertOnMainThread({
     required ui.Image image,
   }) async {
+    final stopwatch = Stopwatch()..start();
+    final imageSize = '${image.width}x${image.height}';
+    
     if (configs.cropToDrawingBounds) {
+      final cropStopwatch = Stopwatch()..start();
       image = await dartUiRemoveTransparentImgAreas(image) ?? image;
+      cropStopwatch.stop();
+      debugPrint(
+        '[BENCHMARK] _convertOnMainThread.crop: ${cropStopwatch.elapsedMilliseconds}ms',
+      );
     }
-    return await encodeImageFromThreadRequest(
+    
+    final convertStopwatch = Stopwatch()..start();
+    final convertedImage = await convertFlutterUiToImage(image);
+    convertStopwatch.stop();
+    debugPrint(
+      '[BENCHMARK] _convertOnMainThread.convertFlutterUiToImage: ${convertStopwatch.elapsedMilliseconds}ms',
+    );
+    
+    final encodeStopwatch = Stopwatch()..start();
+    final result = await encodeImageFromThreadRequest(
       ThreadRequest(
         id: 'id',
-        image: await convertFlutterUiToImage(image),
+        image: convertedImage,
         outputFormat: configs.outputFormat,
         singleFrame: configs.singleFrame,
         jpegQuality: configs.jpegQuality,
@@ -118,6 +146,18 @@ class ImageConverterService {
         pngLevel: configs.pngLevel,
       ),
     );
+    encodeStopwatch.stop();
+    
+    stopwatch.stop();
+    final outputSize = result != null ? '${(result.length / 1024).toStringAsFixed(0)}KB' : 'null';
+    debugPrint(
+      '[BENCHMARK] _convertOnMainThread.encode: ${encodeStopwatch.elapsedMilliseconds}ms',
+    );
+    debugPrint(
+      '[BENCHMARK] _convertOnMainThread TOTAL: ${stopwatch.elapsedMilliseconds}ms (size: $imageSize, format: ${configs.outputFormat.name}, output: $outputSize)',
+    );
+    
+    return result;
   }
 
   /// Prepares the image data required for conversion in a separate thread.

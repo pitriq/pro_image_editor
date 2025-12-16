@@ -9,14 +9,23 @@ import 'package:flutter/foundation.dart';
 Future<ui.Image?> dartUiRemoveTransparentImgAreas(
   ui.Image image,
 ) async {
+  final stopwatch = Stopwatch()..start();
+  final imageSize = '${image.width}x${image.height}';
+  
   // Convert the Image to access pixels
+  final toByteDataStopwatch = Stopwatch()..start();
   final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  toByteDataStopwatch.stop();
+  debugPrint(
+    '[BENCHMARK] dartUiRemoveTransparentImgAreas.toByteData: ${toByteDataStopwatch.elapsedMilliseconds}ms',
+  );
 
   if (byteData == null) return null;
 
   int width = image.width;
   int height = image.height;
 
+  final computeStopwatch = Stopwatch()..start();
   _RemoveHelper res = await compute(
     (_RemoveHelper helper) async {
       int originalWidth = helper.width;
@@ -101,14 +110,26 @@ Future<ui.Image?> dartUiRemoveTransparentImgAreas(
       height: height,
     ),
   );
+  computeStopwatch.stop();
+  debugPrint(
+    '[BENCHMARK] dartUiRemoveTransparentImgAreas.compute (pixel scanning): ${computeStopwatch.elapsedMilliseconds}ms',
+  );
 
   int minX = res.minX;
   int minY = res.minY;
   int maxX = res.maxX;
   int maxY = res.maxY;
 
-  if (maxX < minX || maxY < minY) return image;
+  if (maxX < minX || maxY < minY) {
+    stopwatch.stop();
+    debugPrint(
+      '[BENCHMARK] dartUiRemoveTransparentImgAreas: ${stopwatch.elapsedMilliseconds}ms (no crop needed)',
+    );
+    return image;
+  }
+  
   // Crop the image to the bounding box safely
+  final cropStopwatch = Stopwatch()..start();
   final pictureRecorder = ui.PictureRecorder();
   final canvas = ui.Canvas(pictureRecorder);
 
@@ -123,6 +144,16 @@ Future<ui.Image?> dartUiRemoveTransparentImgAreas(
   final croppedImage = await pictureRecorder
       .endRecording()
       .toImage((maxX - minX + 1).toInt(), (maxY - minY + 1).toInt());
+  cropStopwatch.stop();
+  
+  stopwatch.stop();
+  final croppedSize = '${croppedImage.width}x${croppedImage.height}';
+  debugPrint(
+    '[BENCHMARK] dartUiRemoveTransparentImgAreas.canvas (crop): ${cropStopwatch.elapsedMilliseconds}ms',
+  );
+  debugPrint(
+    '[BENCHMARK] dartUiRemoveTransparentImgAreas: ${stopwatch.elapsedMilliseconds}ms (original: $imageSize, cropped: $croppedSize)',
+  );
 
   return croppedImage;
 }
