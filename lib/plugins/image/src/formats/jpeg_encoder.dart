@@ -11,6 +11,7 @@ import '/plugins/image/src/color/format.dart';
 import '/plugins/image/src/exif/exif_data.dart';
 import '/plugins/image/src/formats/jpeg/jpeg_marker.dart';
 import '/plugins/image/src/image/image.dart';
+import '/plugins/image/src/image/image_data_uint8.dart';
 import '/plugins/image/src/util/output_buffer.dart';
 import 'jpeg/jpeg_chroma.dart';
 
@@ -58,6 +59,7 @@ class JpegHealthyEncoder {
     final bgb = backgroundColor & 0xFF;
     final fallback = ColorInt32.rgb(bgr, bgg, bgb);
     final imageBackground = image.backgroundColor ?? fallback;
+    final canUseDirectAccess = _canUseDirectBufferAccess(image);
 
     Future<void> healthCheck() async {
       await Future.delayed(const Duration(microseconds: 10));
@@ -99,6 +101,7 @@ class JpegHealthyEncoder {
             udu,
             vdu,
             imageBackground: imageBackground,
+            useDirectAccess: canUseDirectAccess,
           );
           dcy = _processDU(fp, ydu, _fdtblY, dcy, _ydcHuffman, _yacHuffman);
           dcu = _processDU(fp, udu, _fdtblUv, dcu, _uvdcHuffman, _uvacHuffman);
@@ -128,6 +131,7 @@ class JpegHealthyEncoder {
             udu[0],
             vdu[0],
             imageBackground: imageBackground,
+            useDirectAccess: canUseDirectAccess,
           );
           _calculateYUV(
             image,
@@ -139,6 +143,7 @@ class JpegHealthyEncoder {
             udu[1],
             vdu[1],
             imageBackground: imageBackground,
+            useDirectAccess: canUseDirectAccess,
           );
           _calculateYUV(
             image,
@@ -150,6 +155,7 @@ class JpegHealthyEncoder {
             udu[2],
             vdu[2],
             imageBackground: imageBackground,
+            useDirectAccess: canUseDirectAccess,
           );
           _calculateYUV(
             image,
@@ -161,6 +167,7 @@ class JpegHealthyEncoder {
             udu[3],
             vdu[3],
             imageBackground: imageBackground,
+            useDirectAccess: canUseDirectAccess,
           );
           _downsampleDU(sudu, udu[0], udu[1], udu[2], udu[3]);
           _downsampleDU(svdu, vdu[0], vdu[1], vdu[2], vdu[3]);
@@ -197,10 +204,98 @@ class JpegHealthyEncoder {
     Float32List udu,
     Float32List vdu, {
     required Color imageBackground,
+    bool useDirectAccess = false,
   }) {
+    if (useDirectAccess) {
+      _calculateYUVDirect(image, x, y, width, height, ydu, udu, vdu, imageBackground);
+      return;
+    }
+    _calculateYUVFallback(image, x, y, width, height, ydu, udu, vdu, imageBackground);
+  }
+
+  /// Calculates YUV values for an 8x8 block using direct buffer access.
+  ///
+  /// This is the optimized path for [ImageDataUint8] without palette.
+  /// Falls back to [_calculateYUVFallback] for other image formats.
+  void _calculateYUVDirect(
+    Image image,
+    int x,
+    int y,
+    int width,
+    int height,
+    Float32List ydu,
+    Float32List udu,
+    Float32List vdu,
+    Color imageBackground,
+  ) {
+    final imageData = image.data as ImageDataUint8;
+    final buffer = imageData.data;
+    final numChannels = imageData.numChannels;
+    final rowStride = imageData.rowStride;
+    final hasAlpha = numChannels > 3;
+
+    // Pre-compute background color for alpha blending (only when needed)
+    late final bgR = imageBackground.r.toInt();
+    late final bgG = imageBackground.g.toInt();
+    late final bgB = imageBackground.b.toInt();
+
     for (var pos = 0; pos < 64; pos++) {
-      final row = pos >> 3; // / 8
-      final col = pos & 7; // % 8
+      final row = pos >> 3;  // pos / 8
+      final col = pos & 7;   // pos % 8
+
+      var yy = y + row;
+      var xx = x + col;
+
+      // Clamp to image bounds (edge pixels repeat)
+      if (yy >= height) yy = height - 1;
+      if (xx >= width) xx = width - 1;
+
+      // Direct buffer index calculation
+      final idx = yy * rowStride + xx * numChannels;
+      
+      int r, g, b;
+      
+      if (hasAlpha) {
+        // Alpha blending with background
+        final a = buffer[idx + 3] / 255.0;
+        final invA = 1.0 - a;
+        r = (buffer[idx] * a + bgR * invA).round();
+        g = (buffer[idx + 1] * a + bgG * invA).round();
+        b = (buffer[idx + 2] * a + bgB * invA).round();
+      } else {
+        // Direct RGB access
+        r = buffer[idx];
+        g = buffer[idx + 1];
+        b = buffer[idx + 2];
+      }
+
+      // RGB to YUV using lookup table
+      ydu[pos] = ((_rgbYuvTable[r] +
+                  _rgbYuvTable[g + 256] +
+                  _rgbYuvTable[b + 512]) >> 16) - 128.0;
+      udu[pos] = ((_rgbYuvTable[r + 768] +
+                  _rgbYuvTable[g + 1024] +
+                  _rgbYuvTable[b + 1280]) >> 16) - 128.0;
+      vdu[pos] = ((_rgbYuvTable[r + 1280] +
+                  _rgbYuvTable[g + 1536] +
+                  _rgbYuvTable[b + 1792]) >> 16) - 128.0;
+    }
+  }
+
+  void _calculateYUVFallback(
+    Image image,
+    int x,
+    int y,
+    int width,
+    int height,
+    Float32List ydu,
+    Float32List udu,
+    Float32List vdu,
+    Color imageBackground,
+  ) {
+    for (var pos = 0; pos < 64; pos++) {
+      final row = pos >> 3;
+      final col = pos & 7;
 
       var yy = y + row;
       var xx = x + col;
@@ -216,9 +311,13 @@ class JpegHealthyEncoder {
       }
 
       Color p = image.getPixel(xx, yy);
+      
+      // Convert to uint8 if needed
       if (p.format != Format.uint8) {
         p = p.convert(format: Format.uint8);
       }
+      
+      // Handle alpha
       if (p.length > 3) {
         final a = p.aNormalized;
         final invA = 1.0 - a;
@@ -227,26 +326,20 @@ class JpegHealthyEncoder {
           ..g = (p.g * a + imageBackground.g * invA).round()
           ..b = (p.b * a + imageBackground.b * invA).round();
       }
+      
       final r = p.r.toInt();
       final g = p.g.toInt();
       final b = p.b.toInt();
 
-      // calculate YUV values
       ydu[pos] = ((_rgbYuvTable[r] +
-                  _rgbYuvTable[(g + 256)] +
-                  _rgbYuvTable[(b + 512)]) >>
-              16) -
-          128.0;
-      udu[pos] = ((_rgbYuvTable[(r + 768)] +
-                  _rgbYuvTable[(g + 1024)] +
-                  _rgbYuvTable[(b + 1280)]) >>
-              16) -
-          128.0;
-      vdu[pos] = ((_rgbYuvTable[(r + 1280)] +
-                  _rgbYuvTable[(g + 1536)] +
-                  _rgbYuvTable[(b + 1792)]) >>
-              16) -
-          128.0;
+                  _rgbYuvTable[g + 256] +
+                  _rgbYuvTable[b + 512]) >> 16) - 128.0;
+      udu[pos] = ((_rgbYuvTable[r + 768] +
+                  _rgbYuvTable[g + 1024] +
+                  _rgbYuvTable[b + 1280]) >> 16) - 128.0;
+      vdu[pos] = ((_rgbYuvTable[r + 1280] +
+                  _rgbYuvTable[g + 1536] +
+                  _rgbYuvTable[b + 1792]) >> 16) - 128.0;
     }
   }
 
@@ -1384,4 +1477,15 @@ class JpegHealthyEncoder {
 
   int _byteNew = 0;
   int _bytePos = 7;
+
+  /// Checks if direct buffer access can be used for the given image.
+  ///
+  /// Returns true if the image uses [ImageDataUint8] format without a palette
+  /// and has at least 3 channels (RGB or RGBA).
+  bool _canUseDirectBufferAccess(Image image) {
+    final data = image.data;
+    return data is ImageDataUint8 &&
+        !data.hasPalette &&
+        data.numChannels >= 3;
+  }
 }
