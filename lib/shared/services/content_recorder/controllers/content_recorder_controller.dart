@@ -53,16 +53,19 @@ class ContentRecorderController {
   late final GlobalKey recorderKey;
 
   /// A service to handle image conversion tasks.
-  late final ImageConverterService _imageConverterService;
+  late ImageConverterService _imageConverterService;
 
   /// A service to manage image rendering operations.
-  late final ImageRenderService _imageRenderService;
+  late ImageRenderService _imageRenderService;
 
   /// Manages threads for multi-threaded image generation.
-  late final ThreadManager _threadManager;
+  late ThreadManager _threadManager;
 
   /// Configuration settings for image generation.
-  final ImageGenerationConfigs _configs;
+  ImageGenerationConfigs _configs;
+
+  /// Returns the current image generation configuration settings.
+  ImageGenerationConfigs get configs => _configs;
 
   /// A stream for sending widgets to the recorder for drawing.
   late final StreamController<Widget?> recorderStream;
@@ -103,6 +106,56 @@ class ContentRecorderController {
     }
 
     _threadManager.destroy();
+  }
+
+  /// Updates the image generation configuration settings.
+  ///
+  /// This method allows changing configurations like output format, quality,
+  /// max output size, and other image generation parameters after the
+  /// controller has been initialized.
+  ///
+  /// The method will:
+  /// - Update the internal configuration
+  /// - Recreate the image converter service with the new settings
+  /// - Recreate the image render service with the new settings
+  /// - Optionally recreate the thread manager if threading-related settings
+  ///   have changed (like [ProcessorConfigs] or [enableIsolateGeneration])
+  ///
+  /// Example usage:
+  /// ```dart
+  /// controller.setImageGenerationConfigs(
+  ///   ImageGenerationConfigs(
+  ///     outputFormat: OutputFormat.png,
+  ///     jpegQuality: 90,
+  ///     maxOutputSize: Size(1920, 1080),
+  ///   ),
+  /// );
+  /// ```
+  ///
+  /// - [newConfigs]: The new configuration settings to apply.
+  void setImageGenerationConfigs(ImageGenerationConfigs newConfigs) {
+    final bool threadingConfigsChanged =
+        _configs.enableIsolateGeneration != newConfigs.enableIsolateGeneration ||
+            _configs.processorConfigs != newConfigs.processorConfigs;
+
+    _configs = newConfigs;
+
+    // Recreate thread manager first if threading-related configs changed
+    if (threadingConfigsChanged) {
+      _threadManager.destroy();
+      _initializeMultiThreading(false);
+    }
+
+    // Recreate services with updated configs (and potentially new thread manager)
+    _imageConverterService = ImageConverterService(
+      configs: _configs.copyWith(
+        cropToDrawingBounds:
+            isVideoEditor ? false : _configs.cropToDrawingBounds,
+        cropToImageBounds: isVideoEditor ? true : _configs.cropToImageBounds,
+      ),
+      threadManager: _threadManager,
+    );
+    _imageRenderService = ImageRenderService(_configs);
   }
 
   /// Converts a given `ui.Image` into a `Uint8List` format, which can be used

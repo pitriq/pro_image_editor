@@ -2472,6 +2472,43 @@ class ProImageEditorState extends State<ProImageEditor>
     _controllers.uiLayerCtrl.add(null);
   }
 
+  /// Updates the image generation configuration settings at runtime.
+  ///
+  /// This method allows dynamically changing configurations like output format,
+  /// JPEG quality, max output size, and other image generation parameters
+  /// after the editor has been initialized.
+  ///
+  /// The new configuration will be applied to subsequent image generation
+  /// operations. If threading-related settings (like [ProcessorConfigs] or
+  /// [enableIsolateGeneration]) change, the thread manager will be recreated.
+  ///
+  /// Example usage:
+  /// ```dart
+  /// // Get the editor state via a GlobalKey
+  /// final editorState = editorKey.currentState as ProImageEditorState;
+  ///
+  /// // Update configuration to use PNG format with custom size
+  /// editorState.setImageGenerationConfigs(
+  ///   ImageGenerationConfigs(
+  ///     outputFormat: OutputFormat.png,
+  ///     maxOutputSize: Size(1920, 1080),
+  ///   ),
+  /// );
+  ///
+  /// // Or use copyWith to modify existing configs
+  /// editorState.setImageGenerationConfigs(
+  ///   editorState.imageGenerationConfigs.copyWith(
+  ///     jpegQuality: 90,
+  ///     outputFormat: OutputFormat.jpg,
+  ///   ),
+  /// );
+  /// ```
+  ///
+  /// - [newConfigs]: The new configuration settings to apply.
+  void setImageGenerationConfigs(ImageGenerationConfigs newConfigs) {
+    _controllers.screenshot.setImageGenerationConfigs(newConfigs);
+  }
+
   @override
   Widget build(BuildContext context) {
     _theme = configs.theme ??
