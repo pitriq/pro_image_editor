@@ -124,6 +124,8 @@ Future<ui.Image?> dartUiRemoveTransparentImgAreas(
       .endRecording()
       .toImage((maxX - minX + 1).toInt(), (maxY - minY + 1).toInt());
 
+  image.dispose();
+
   return croppedImage;
 }
 

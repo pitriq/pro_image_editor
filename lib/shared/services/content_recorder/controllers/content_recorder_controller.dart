@@ -193,17 +193,22 @@ class ContentRecorderController {
     }
 
     outputFormat ??= _configs.outputFormat;
+    final shouldDisposeImage = image == null;
     image ??= await getRawRenderedImage(imageInfos: imageInfos);
     id ??= generateUniqueId();
     onImageCaptured?.call(image);
 
     if (image == null) return null;
 
-    return await _imageConverterService.convert(
+    final bytes = await _imageConverterService.convert(
       image: image,
       id: id,
       format: outputFormat,
     );
+
+    if (shouldDisposeImage) image.dispose();
+
+    return bytes;
   }
 
   /// Captures the visual representation of a widget, rendering it into an image
@@ -422,37 +427,42 @@ class ContentRecorderController {
     );
     if (!isFormatSame || isOutputSizeTooLarge) {
       final ui.Image image = await decodeImageFromList(bytes);
-      if (_configs.enableIsolateGeneration) {
-        /// Recapture the image if the output format is incorrect or the output
-        /// size is too large.
-        if (kIsWeb || isOutputSizeTooLarge) {
-          /// Due to a known issue with image decoding in Flutter web, we need
-          /// to recapture the image to ensure accuracy.
-          bytes = widget == null
-              ? await _captureImageContent(
-                  id: id,
-                  imageInfos: imageInfos,
-                )
-              : await _captureWidget(
-                  widget,
-                  id: id,
-                  targetSize: targetSize,
-                  imageInfos: imageInfos,
-                );
+      try {
+        if (_configs.enableIsolateGeneration) {
+          /// Recapture the image if the output format is incorrect or the output
+          /// size is too large.
+          if (kIsWeb || isOutputSizeTooLarge) {
+            /// Due to a known issue with image decoding in Flutter web, we need
+            /// to recapture the image to ensure accuracy.
+            bytes = widget == null
+                ? await _captureImageContent(
+                    id: id,
+                    imageInfos: imageInfos,
+                  )
+                : await _captureWidget(
+                    widget,
+                    id: id,
+                    targetSize: targetSize,
+                    imageInfos: imageInfos,
+                  );
+          } else {
+            /// Send the image to the separate thread for encoding.
+            bytes = await _threadManager.send(
+              await _generateSendEncodeData(
+                id: id,
+                image: image,
+              ),
+            );
+          }
         } else {
-          /// Send the image to the separate thread for encoding.
-          bytes = await _threadManager.send(
-            await _generateSendEncodeData(
-              id: id,
-              image: image,
-            ),
+          /// Encode the image on the main thread.
+          bytes = await encodeImageFromThreadRequest(
+            await _generateSendEncodeData(image: image, id: 'id'),
           );
         }
-      } else {
-        /// Encode the image on the main thread.
-        bytes = await encodeImageFromThreadRequest(
-          await _generateSendEncodeData(image: image, id: 'id'),
-        );
+      } finally {
+        // Dispose the ui.Image to free GPU memory
+        image.dispose();
       }
     }
 

@@ -195,6 +195,8 @@ mixin StandaloneEditorState<T extends StatefulWidget,
           decodedImage.width.toDouble(),
           decodedImage.height.toDouble(),
         );
+        decodedImage.dispose();
+
         Size? outputSize = transform?.getCropSize(originalImageSize);
         Offset? outputOffset = transform?.getCropStartOffset(originalImageSize);
 

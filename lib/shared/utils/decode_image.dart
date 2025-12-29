@@ -21,6 +21,8 @@ Future<ImageInfos> decodeImageInfos({
   int width = decodedImage.width;
   int height = decodedImage.height;
 
+  decodedImage.dispose();
+
   double calculatePixelRatio(num width, num height) {
     bool fitToHeight = screenSize.aspectRatio > (width / height);
     double widthRatio = width / screenSize.width;

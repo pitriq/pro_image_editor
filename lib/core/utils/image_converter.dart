@@ -69,7 +69,7 @@ class ImageConverter {
       image: convertedImage,
     );
 
-    /// Clean up
+    convertedImage.dispose();
     await recorder.destroy();
 
     return resultBytes;

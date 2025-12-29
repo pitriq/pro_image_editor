@@ -598,9 +598,14 @@ class CropRotateEditorState extends State<CropRotateEditor>
     var decodedImage =
         await decodeImageFromList(await editorImage!.safeByteArray(context));
 
-    if (!mounted) return;
+    if (!mounted) {
+      decodedImage.dispose();
+      return;
+    }
     var w = decodedImage.width;
     var h = decodedImage.height;
+
+    decodedImage.dispose();
 
     var widthRatio = w.toDouble() / editorBodySize.width;
     var heightRatio = h.toDouble() / editorBodySize.height;
@@ -846,6 +851,8 @@ class CropRotateEditorState extends State<CropRotateEditor>
             decodedImage.width.toDouble(),
             decodedImage.height.toDouble(),
           );
+          // Dispose the ui.Image now that we've extracted the dimensions
+          decodedImage.dispose();
         }
 
         Size? outputSize = transformC.getCropSize(originalImageSize);
