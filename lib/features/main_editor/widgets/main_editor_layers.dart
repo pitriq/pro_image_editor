@@ -29,6 +29,7 @@ class MainEditorLayers extends StatefulWidget {
     required this.sizesManager,
     required this.activeLayers,
     required this.isSubEditorOpen,
+    required this.isProcessingFinalImage,
     required this.onCheckInteractiveViewer,
     required this.onTextLayerTap,
     required this.onEditPaintLayer,
@@ -71,6 +72,9 @@ class MainEditorLayers extends StatefulWidget {
 
   /// Indicates whether a sub-editor is currently open.
   final bool isSubEditorOpen;
+
+  /// Indicates whether the final image is being processed (e.g. screenshot).
+  final bool isProcessingFinalImage;
 
   /// Callback to check the state of the interactive viewer.
   final Function() onCheckInteractiveViewer;
@@ -179,7 +183,7 @@ class _MainEditorLayersState extends State<MainEditorLayers> {
       layersService: _layersService,
       layerInteractionManager: _layerInteractionManager,
       editorBodySize: _editorBodySize,
-      isInteractive: !widget.isSubEditorOpen,
+      isInteractive: !widget.isSubEditorOpen && !widget.isProcessingFinalImage,
       enableMouseCursor: !widget.dragSelectionService.isActive,
       onDuplicate: () => widget.onDuplicateLayer(layer),
       onContextMenuToggled: widget.onContextMenuToggled,

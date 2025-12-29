@@ -2763,6 +2763,7 @@ class ProImageEditorState extends State<ProImageEditor>
       sizesManager: sizesManager,
       activeLayers: activeLayers,
       isSubEditorOpen: isSubEditorOpen,
+      isProcessingFinalImage: _isProcessingFinalImage,
       onCheckInteractiveViewer: _checkInteractiveViewer,
       onTextLayerTap: _onTextLayerTap,
       onEditPaintLayer: _editPaintLayer,

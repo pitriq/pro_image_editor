@@ -168,6 +168,11 @@ class MainEditorInteractiveContent extends StatelessWidget {
             ...configs.mainEditor.widgets.bodyItems!(
               state,
               rebuildController.stream,
+            ).map(
+              (widget) => IgnorePointer(
+                ignoring: processFinalImage,
+                child: widget,
+              ),
             ),
         ],
       ),
