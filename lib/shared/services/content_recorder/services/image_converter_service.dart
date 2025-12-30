@@ -102,22 +102,33 @@ class ImageConverterService {
   Future<Uint8List?> _convertOnMainThread({
     required ui.Image image,
   }) async {
+    ui.Image? croppedImage;
     if (configs.cropToDrawingBounds) {
-      image = await dartUiRemoveTransparentImgAreas(image) ?? image;
+      final result = await dartUiRemoveTransparentImgAreas(image);
+      if (result != null && result != image) {
+        croppedImage = result;
+        image = result;
+      } else if (result != null) {
+        image = result;
+      }
     }
-    return await encodeImageFromThreadRequest(
-      ThreadRequest(
-        id: 'id',
-        image: await convertFlutterUiToImage(image),
-        outputFormat: configs.outputFormat,
-        singleFrame: configs.singleFrame,
-        jpegQuality: configs.jpegQuality,
-        jpegBackgroundColor: configs.jpegBackgroundColor.toARGB32(),
-        jpegChroma: configs.jpegChroma,
-        pngFilter: configs.pngFilter,
-        pngLevel: configs.pngLevel,
-      ),
-    );
+    try {
+      return await encodeImageFromThreadRequest(
+        ThreadRequest(
+          id: 'id',
+          image: await convertFlutterUiToImage(image),
+          outputFormat: configs.outputFormat,
+          singleFrame: configs.singleFrame,
+          jpegQuality: configs.jpegQuality,
+          jpegBackgroundColor: configs.jpegBackgroundColor.toARGB32(),
+          jpegChroma: configs.jpegChroma,
+          pngFilter: configs.pngFilter,
+          pngLevel: configs.pngLevel,
+        ),
+      );
+    } finally {
+      croppedImage?.dispose();
+    }
   }
 
   /// Prepares the image data required for conversion in a separate thread.

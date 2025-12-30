@@ -330,4 +330,16 @@ class StateManager {
       }
     }
   }
+
+  /// Clears all state data to free memory.
+  void clear() {
+    _stateHistory.clear();
+    screenshots.clear();
+    _backgroundImages.clear();
+    activeLayers.clear();
+    _activeFilters = [];
+    _activeTuneAdjustments = [];
+    activeBackgroundImage = null;
+    _historyPointer = 0;
+  }
 }

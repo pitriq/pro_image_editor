@@ -619,6 +619,7 @@ class ProImageEditorState extends State<ProImageEditor>
     _rebuildController.close();
     _controllers.dispose();
     layerInteractionManager.scaleDebounce.dispose();
+    stateManager.clear();
     SystemChrome.setSystemUIOverlayStyle(
       _theme.brightness == Brightness.dark
           ? SystemUiOverlayStyle.light

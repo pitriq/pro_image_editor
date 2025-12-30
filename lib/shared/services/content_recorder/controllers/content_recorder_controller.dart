@@ -248,14 +248,18 @@ class ContentRecorderController {
 
     recorderStream.add(null);
 
-    return _captureImageContent(
-      image: image,
-      imageInfos: imageInfos,
-      id: id,
-      onImageCaptured: onImageCaptured,
-      stateHistoryScreenshot: enableStateHistoryScreenshot,
-      outputFormat: format,
-    );
+    try {
+      return await _captureImageContent(
+        image: image,
+        imageInfos: imageInfos,
+        id: id,
+        onImageCaptured: onImageCaptured,
+        stateHistoryScreenshot: enableStateHistoryScreenshot,
+        outputFormat: format,
+      );
+    } finally {
+      image?.dispose();
+    }
   }
 
   /// Handles the process of capturing an image from the provided configuration
@@ -461,7 +465,6 @@ class ContentRecorderController {
           );
         }
       } finally {
-        // Dispose the ui.Image to free GPU memory
         image.dispose();
       }
     }

@@ -33,7 +33,10 @@ Future<Uint8List> createTransparentImage(Size size) async {
 
   final picture = recorder.endRecording();
   final img = await picture.toImage(width.toInt(), height.toInt());
-  final pngBytes = await img.toByteData(format: ui.ImageByteFormat.png);
-
-  return pngBytes!.buffer.asUint8List();
+  try {
+    final pngBytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    return pngBytes!.buffer.asUint8List();
+  } finally {
+    img.dispose();
+  }
 }

@@ -296,6 +296,7 @@ mixin StandaloneEditorState<T extends StatefulWidget,
   @override
   @mustCallSuper
   void dispose() {
+    editorImage?.toImageProvider().evict();
     screenshotCtrl.destroy();
     rebuildController.close();
     super.dispose();
