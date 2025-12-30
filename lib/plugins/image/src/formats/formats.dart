@@ -1,5 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
+
+import 'package:ffi_jpeg_encode/ffi_jpeg_encode.dart';
+import 'package:flutter/foundation.dart';
 
 import '../image/image.dart';
 import 'bmp_encoder.dart';
@@ -20,13 +22,38 @@ Future<Uint8List> encodeJpg(
   required int backgroundColor,
   JpegChroma chroma = JpegChroma.yuv444,
   Completer<void>? destroy$,
-}) =>
-    JpegHealthyEncoder(quality: quality).encode(
+}) async {
+  final imageData = image.data;
+  if (imageData == null) {
+    throw ArgumentError('Cannot encode image: image data is null');
+  }
+
+  try {
+    final pixels = imageData.buffer.asUint8List();
+    final subsampling = switch (chroma) {
+      JpegChroma.yuv444 => JpegSubsampling.yuv444,
+      JpegChroma.yuv420 => JpegSubsampling.yuv420,
+    };
+
+    final bytes = encodeJpegToBytes(
+      pixels,
+      image.width,
+      image.height,
+      imageData.numChannels,
+      quality: quality,
+      subsampling: subsampling,
+    );
+
+    return bytes;
+  } catch (_) {
+    return JpegHealthyEncoder(quality: quality).encode(
       image,
+      backgroundColor: backgroundColor,
       chroma: chroma,
       destroy$: destroy$,
-      backgroundColor: backgroundColor,
     );
+  }
+}
 
 /// Encode an image to the PNG format.
 Uint8List encodePng(Image image,
